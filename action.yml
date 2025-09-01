@@ -1,0 +1,25 @@
+name: 'Tencent Cloud CDN Action'
+description: 'Refresh / Preload CDN cache on Tencent Cloud'
+author: 'linrongda'
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  secret_id:
+    description: 'Tencent Cloud SecretId'
+    required: true
+  secret_key:
+    description: 'Tencent Cloud SecretKey'
+    required: true
+  action:
+    description: 'CDN action type: purgePath | purgeUrls | pushUrls'
+    required: false
+    default: 'purgePath'
+  paths:
+    description: 'List of URLs or directories to operate on (JSON array string)'
+    required: true
+
+runs:
+  using: 'node20'
+  main: 'main.js'
