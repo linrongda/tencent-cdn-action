@@ -23,9 +23,9 @@ In your GitHub repository, go to
 * `TENCENT_SECRET_ID`
 * `TENCENT_SECRET_KEY`
 
-(You can get these from [Tencent Cloud API Key Management](https://console.cloud.tencent.com/cam/capi))
+You can get these like: [Create a sub-user to obtain Tencent Cloud API keys](https://ohttps.com/docs/cloud/tcloud/cdn) (You can select only `QcloudCDNFullAccess`.)
 
-Make sure the Tencent Cloud account you use has the `QcloudCDNFullAccess` permissions:
+**Attention**: Make sure the Tencent Cloud account you use has the `QcloudCDNFullAccess` permissions!
 
 ---
 
