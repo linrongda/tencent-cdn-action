@@ -1,6 +1,6 @@
-# Tencent Cloud CDN Action
+# Tencent Cloud CDN & EdgeOne Action
 
-GitHub Action for refreshing and preheating **Tencent Cloud CDN** cache.
+GitHub Action for refreshing and preheating **Tencent Cloud CDN & EdgeOne** cache.
 Supports **refreshing directories**, **refreshing URLs**, and **preheating URLs**.
 
 ---
@@ -23,9 +23,9 @@ In your GitHub repository, go to
 * `TENCENT_SECRET_ID`
 * `TENCENT_SECRET_KEY`
 
-You can get these like: [Create a sub-user to obtain Tencent Cloud API keys](https://ohttps.com/docs/cloud/tcloud/cdn) (You can select only `QcloudCDNFullAccess`.)
+You can get these like: [Create a sub-user to obtain Tencent Cloud API keys](https://ohttps.com/docs/cloud/tcloud/cdn) (You can select only `QcloudCDNFullAccess` or `QcloudTEOFullAccess` .)
 
-**Attention**: Make sure the Tencent Cloud account you use has the `QcloudCDNFullAccess` permissions!
+**Attention**: Make sure the Tencent Cloud account you use has the `QcloudCDNFullAccess` or `QcloudTEOFullAccess` permissions!
 
 ---
 
@@ -49,12 +49,14 @@ jobs:
       # ... Your build & deploy steps
 
       - name: Refresh CDN cache
-        uses: linrongda/tencent-cdn-action@v1
+        uses: linrongda/tencent-cdn-action@v1.5
         with:
           secret_id: ${{ secrets.TENCENT_SECRET_ID }}
           secret_key: ${{ secrets.TENCENT_SECRET_KEY }}
           action: purgePath
-          paths: '["https://example.com/"]'
+          cdn-paths: '["https://example.com/"]'
+          # eo-zoneid: ${{ secrets.EDGEONE_ZONE_ID }}
+          # eo-paths: '["https://example.com/"]'
 ```
 
 ---
@@ -63,11 +65,12 @@ jobs:
 
 | Name         | Required | Default     | Description                                            |
 | ------------ | -------- | ----------- | ------------------------------------------------------ |
-| `secret_id`  | ✅        | —           | Tencent Cloud API SecretId                             |
-| `secret_key` | ✅        | —           | Tencent Cloud API SecretKey                            |
-| `action`     | ❌        | `purgePath` | Operation type: `purgePath` / `purgeUrls` / `pushUrls` |
-| `paths`      | ✅        | —           | JSON array string of URLs or directories               |
-
+| `secret_id`  | ✅       | —           | Tencent Cloud API SecretId                             |
+| `secret_key` | ✅       | —           | Tencent Cloud API SecretKey                            |
+| `action`     | ❌       | `purgePath` | Operation type: `purgePath` / `purgeUrls` / `pushUrls` |
+| `cdn-paths`  | ❌       | —           | JSON array string of URLs or directories               |
+| `eo-zoneid`  | ❌       | —           | EdgeOne ZoneId                                         |
+| `eo-paths`   | ❌       | —           | JSON array string of URLs or directories               |
 ---
 
 ### 4. Examples
@@ -80,7 +83,9 @@ jobs:
     secret_id: ${{ secrets.TENCENT_SECRET_ID }}
     secret_key: ${{ secrets.TENCENT_SECRET_KEY }}
     action: purgePath
-    paths: '["https://example.com/"]'
+    cdn-paths: '["https://example.com/"]'
+    # eo-zoneid: ${{ secrets.EDGEONE_ZONE_ID }}
+    # eo-paths: '["https://example.com/"]'
 ```
 
 #### Refresh specific URLs
@@ -91,7 +96,9 @@ jobs:
     secret_id: ${{ secrets.TENCENT_SECRET_ID }}
     secret_key: ${{ secrets.TENCENT_SECRET_KEY }}
     action: purgeUrls
-    paths: '["https://example.com/index.html","https://example.com/style.css"]'
+    cdn-paths: '["https://example.com/index.html","https://example.com/style.css"]'
+    # eo-zoneid: ${{ secrets.EDGEONE_ZONE_ID }}
+    # eo-paths: '["https://example.com/index.html","https://example.com/style.css"]'
 ```
 
 #### Preheat URLs
@@ -102,7 +109,9 @@ jobs:
     secret_id: ${{ secrets.TENCENT_SECRET_ID }}
     secret_key: ${{ secrets.TENCENT_SECRET_KEY }}
     action: pushUrls
-    paths: '["https://example.com/index.html"]'
+    cdn-paths: '["https://example.com/index.html"]'
+    # eo-zoneid: ${{ secrets.EDGEONE_ZONE_ID }}
+    # eo-paths: '["https://example.com/index.html"]'
 ```
 
 ---
@@ -110,9 +119,9 @@ jobs:
 ### 5. Outputs
 
 ```yaml
-🔧 Initialization
+🔧 Initializing CDN client
   Action type: purgePath
-  Target paths: ["https://example.com/"]
+  Target cdn paths: ["https://example.com/"]
 
 🚀 Executing CDN operation
   Selected operation: PurgePathCache (Directory refresh)

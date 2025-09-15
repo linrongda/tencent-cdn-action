@@ -1,5 +1,5 @@
-name: 'Tencent Cloud CDN Action'
-description: 'Refresh / Preload CDN cache on Tencent Cloud'
+name: 'Tencent Cloud CDN & EdgeOne Action'
+description: 'Refresh / Preload CDN cache on Tencent Cloud and EdgeOne'
 author: 'linrongda'
 branding:
   icon: 'refresh-cw'
@@ -16,9 +16,15 @@ inputs:
     description: 'CDN action type: purgePath | purgeUrls | pushUrls'
     required: false
     default: 'purgePath'
-  paths:
+  cdn-paths:
     description: 'List of URLs or directories to operate on (JSON array string)'
-    required: true
+    required: false
+  eo-zoneid:
+    description: 'EdgeOne Zone ID (required for purgeUrls and pushUrls)'
+    required: false
+  eo-paths:
+    description: 'List of URLs to operate on EdgeOne (JSON array string, required for purgeUrls and pushUrls)'
+    required: false
 
 runs:
   using: 'node20'
