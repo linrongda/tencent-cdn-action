@@ -13,18 +13,15 @@ inputs:
     description: 'Tencent Cloud SecretKey'
     required: true
   action:
-    description: 'CDN action type: purgePath | purgeUrls | pushUrls'
-    required: false
+    description: 'Action type: purgePath | purgeUrls | pushUrls'
+    required: true
     default: 'purgePath'
-  cdn-paths:
-    description: 'List of URLs or directories to operate on (JSON array string)'
-    required: false
-  eo-zoneid:
-    description: 'EdgeOne Zone ID (required for purgeUrls and pushUrls)'
-    required: false
-  eo-paths:
-    description: 'List of URLs to operate on EdgeOne (JSON array string, required for purgeUrls and pushUrls)'
-    required: false
+  paths:
+    description: |
+      Each line contains paths separated by spaces.
+      If a line begins with a Zone ID (starts with `zone-`) the remainder of that line are EdgeOne targets for that zone.
+      Otherwise tokens are treated as CDN paths.
+    required: true
 
 runs:
   using: 'node20'

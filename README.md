@@ -5,6 +5,35 @@ Supports **refreshing directories**, **refreshing URLs**, and **preheating URLs*
 
 ---
 
+## ⚠️ Migration (breaking change)
+
+This action no longer accepts the previous JSON-style inputs (`cdn-paths`, `eo-paths`, `eo-zoneid`).
+You must now provide targets using the multiline `paths` input. Each line contains one or more tokens separated by whitespace. Lines starting with a Zone ID (`zone-...`) are treated as EdgeOne zone entries; other tokens are treated as CDN paths.
+
+Example migration:
+
+Old (JSON inputs):
+
+```yaml
+with:
+  cdn-paths: '["https://example.com/"]'
+  eo-zoneid: 'zone-XXXX'
+  eo-paths: '["https://example.com/"]'
+```
+
+New (`paths`):
+
+```yaml
+with:
+  paths: |
+    https://example.com/
+    zone-XXXX https://example.com/
+```
+
+The new `paths` format is simpler and supports multiple EO zones in the same input.
+
+---
+
 ## ✨ Features
 
 * ✅ **PurgePathCache**: Refresh directory cache (e.g. `https://example.com/`)
@@ -48,15 +77,15 @@ jobs:
 
       # ... Your build & deploy steps
 
-      - name: Refresh CDN cache
-        uses: linrongda/tencent-cdn-action@v1.5
+      - name: Refresh CDN / EdgeOne cache
+        uses: linrongda/tencent-cdn-action@v2
         with:
           secret_id: ${{ secrets.TENCENT_SECRET_ID }}
           secret_key: ${{ secrets.TENCENT_SECRET_KEY }}
           action: purgePath
-          cdn-paths: '["https://example.com/"]'
-          # eo-zoneid: ${{ secrets.EDGEONE_ZONE_ID }}
-          # eo-paths: '["https://example.com/"]'
+          paths: |
+            https://example.com/ https://www.example.com/
+            zone-XXXX https://example.com/ https://eo.example.com/
 ```
 
 ---
@@ -67,10 +96,8 @@ jobs:
 | ------------ | -------- | ----------- | ------------------------------------------------------ |
 | `secret_id`  | ✅       | —           | Tencent Cloud API SecretId                             |
 | `secret_key` | ✅       | —           | Tencent Cloud API SecretKey                            |
-| `action`     | ❌       | `purgePath` | Operation type: `purgePath` / `purgeUrls` / `pushUrls` |
-| `cdn-paths`  | ❌       | —           | JSON array string of URLs or directories               |
-| `eo-zoneid`  | ❌       | —           | EdgeOne ZoneId                                         |
-| `eo-paths`   | ❌       | —           | JSON array string of URLs or directories               |
+| `action`     | ✅       | `purgePath` | Operation type: `purgePath` / `purgeUrls` / `pushUrls` |
+| `paths`      | ✅       | —           | Multiline plain text. Each line tokens separated by spaces. Lines starting with `zone-...` are treated as EdgeOne zone entries. |
 ---
 
 ### 4. Examples
@@ -78,40 +105,40 @@ jobs:
 #### Refresh whole directory
 
 ```yaml
-- uses: linrongda/tencent-cdn-action@v1
+- uses: linrongda/tencent-cdn-action@v2
   with:
     secret_id: ${{ secrets.TENCENT_SECRET_ID }}
     secret_key: ${{ secrets.TENCENT_SECRET_KEY }}
     action: purgePath
-    cdn-paths: '["https://example.com/"]'
-    # eo-zoneid: ${{ secrets.EDGEONE_ZONE_ID }}
-    # eo-paths: '["https://example.com/"]'
+    paths: |
+      https://example.com/ https://www.example.com/
+      zone-XXXX https://example.com/ https://eo.example.com/
 ```
 
 #### Refresh specific URLs
 
 ```yaml
-- uses: linrongda/tencent-cdn-action@v1
+- uses: linrongda/tencent-cdn-action@v2
   with:
     secret_id: ${{ secrets.TENCENT_SECRET_ID }}
     secret_key: ${{ secrets.TENCENT_SECRET_KEY }}
     action: purgeUrls
-    cdn-paths: '["https://example.com/index.html","https://example.com/style.css"]'
-    # eo-zoneid: ${{ secrets.EDGEONE_ZONE_ID }}
-    # eo-paths: '["https://example.com/index.html","https://example.com/style.css"]'
+    paths: |
+      https://example.com/index.html
+      zone-XXXX https://example.com/style.css
 ```
 
 #### Preheat URLs
 
 ```yaml
-- uses: linrongda/tencent-cdn-action@v1
+- uses: linrongda/tencent-cdn-action@v2
   with:
     secret_id: ${{ secrets.TENCENT_SECRET_ID }}
     secret_key: ${{ secrets.TENCENT_SECRET_KEY }}
     action: pushUrls
-    cdn-paths: '["https://example.com/index.html"]'
-    # eo-zoneid: ${{ secrets.EDGEONE_ZONE_ID }}
-    # eo-paths: '["https://example.com/index.html"]'
+    paths: |
+      https://example.com/index.html
+      zone-XXXX https://example.com/style.css
 ```
 
 ---

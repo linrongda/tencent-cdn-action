@@ -1,13 +1,58 @@
 const core = require('@actions/core');
 const tencentcloud = require("tencentcloud-sdk-nodejs");
 
+// Read raw inputs
+const secretId = core.getInput('secret_id');
+const secretKey = core.getInput('secret_key');
+const action = core.getInput('action');
+const pathsRaw = core.getInput('paths');
+
+// Parse `paths` format into cdn paths and eo entries (zone -> paths)
+// Format: multi-line text, tokens separated by whitespace. Lines starting with `zone-` are treated as EO entries.
+function parsePurePaths(text) {
+  const cdn = [];
+  const eoMap = {}; // zoneId -> Set(paths)
+
+  if (!text) return { cdn, eoMap };
+
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    // split by whitespace
+    const tokens = t.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) continue;
+
+    if (tokens[0].startsWith('zone-')) {
+      const zoneId = tokens[0];
+      const paths = tokens.slice(1);
+      if (!eoMap[zoneId]) eoMap[zoneId] = new Set();
+      for (const p of paths) eoMap[zoneId].add(p);
+    } else {
+      for (const p of tokens) cdn.push(p);
+    }
+  }
+
+  // convert sets to arrays
+  for (const k of Object.keys(eoMap)) {
+    eoMap[k] = Array.from(eoMap[k]);
+  }
+
+  return { cdn, eoMap };
+}
+
+const parsed = parsePurePaths(pathsRaw);
+
+// Build CDN paths (deduplicated) and EO entries from `paths` only
+const cdnPaths = Array.from(new Set(parsed.cdn));
+const eoEntries = Object.keys(parsed.eoMap).map(zoneId => ({ zoneId, paths: parsed.eoMap[zoneId].slice() }));
+
 const input = {
-  secretId: core.getInput('secret_id'),
-  secretKey: core.getInput('secret_key'),
-  action: core.getInput('action'),
-  cdnPaths: JSON.parse(core.getInput('cdn-paths')),
-  eoZoneId: core.getInput('eo-zoneid'),
-  eoPaths: JSON.parse(core.getInput('eo-paths')),
+  secretId,
+  secretKey,
+  action,
+  cdnPaths,
+  eoEntries, // array of { zoneId, paths }
 };
 
 async function initialcdn() {
@@ -32,8 +77,6 @@ async function initialeo() {
   core.startGroup("🔧 Initializing EdgeOne client");
 
   core.info(`Action type: ${input.action}`);
-  core.info(`EdgeOne Zone ID: ${input.eoZoneId}`);
-  core.info(`Target EdgeOne paths: ${JSON.stringify(input.eoPaths)}`);
   const eoClient = tencentcloud.teo.v20220901.Client;
   const client = new eoClient({
     credential: { secretId: input.secretId, secretKey: input.secretKey },
@@ -47,7 +90,7 @@ async function initialeo() {
   return client;
 }
 
-async function executeCdnOperation(client) {
+async function executeCdnOperation(client, paths) {
   core.startGroup("🚀 Executing CDN operation");
 
   let params = {};
@@ -56,15 +99,15 @@ async function executeCdnOperation(client) {
   if (input.action === 'purgePath') {
     core.info("Selected operation: PurgePathCache (Directory refresh)");
     fn = client.PurgePathCache.bind(client);
-    params = { Paths: input.cdnPaths, FlushType: "flush" };
+    params = { Paths: paths, FlushType: "flush" };
   } else if (input.action === 'purgeUrls') {
     core.info("Selected operation: PurgeUrlsCache (URL refresh)");
     fn = client.PurgeUrlsCache.bind(client);
-    params = { Urls: input.cdnPaths };
+    params = { Urls: paths };
   } else if (input.action === 'pushUrls') {
     core.info("Selected operation: PushUrlsCache (URL prefetch)");
     fn = client.PushUrlsCache.bind(client);
-    params = { Urls: input.cdnPaths };
+    params = { Urls: paths };
   } else {
     throw new Error(`Unknown action type: ${input.action}`);
   }
@@ -85,7 +128,7 @@ async function executeCdnOperation(client) {
   core.setOutput("response", result);
 }
 
-async function executeEoOperation(client) {
+async function executeEoOperation(client, zoneId, paths) {
   core.startGroup("🚀 Executing EdgeOne operation");
 
   let params = {};
@@ -94,15 +137,15 @@ async function executeEoOperation(client) {
   if (input.action === 'purgePath') {
     core.info("Selected operation: PurgeUrls (Directory refresh)");
     fn = client.CreatePurgeTask.bind(client);
-    params = { ZoneId: input.eoZoneId, Type: "purge_prefix", Targets: input.eoPaths };
+    params = { ZoneId: zoneId, Type: "purge_prefix", Targets: paths };
   } else if (input.action === 'purgeUrls') {
     core.info("Selected operation: PurgeUrls (URL refresh)");
     fn = client.CreatePurgeTask.bind(client);
-    params = { ZoneId: input.eoZoneId, Type: "purge_url", Targets: input.eoPaths };
+    params = { ZoneId: zoneId, Type: "purge_url", Targets: paths };
   } else if (input.action === 'pushUrls') {
     core.info("Selected operation: PurgeUrls (URL prefetch)");
     fn = client.CreatePrefetchTask.bind(client);
-    params = { ZoneId: input.eoZoneId, Targets: input.eoPaths };
+    params = { ZoneId: zoneId, Targets: paths };
   } else {
     throw new Error(`EdgeOne does not support action type: ${input.action}, skipping EdgeOne operation.`);
   }
@@ -125,13 +168,31 @@ async function executeEoOperation(client) {
 
 async function main() {
   try {
-    if (input.cdnPaths) {
-      const cdn = await initialcdn()
-      await executeCdnOperation(cdn);
+    // Validate that we have at least one target (CDN path or EO entry)
+    const hasCdn = Array.isArray(input.cdnPaths) && input.cdnPaths.length > 0;
+    const hasEo = Array.isArray(input.eoEntries) && input.eoEntries.length > 0;
+    if (!hasCdn && !hasEo) {
+      const example = `paths: |\n  https://example.com/ https://www.example.com/\n  zone-XXXX https://example.com/ https://eo.example.com/`;
+      const msg = `No target paths found. Provide targets via the required \`paths\` input (breaking change). Example:\n\n${example}`;
+      core.error(msg);
+      core.setFailed('No target paths provided');
+      throw new Error('No target paths provided');
     }
-    if (input.eoPaths && input.eoZoneId) {
-      const eo = await initialeo()
-      await executeEoOperation(eo);
+
+    // CDN operations (if any cdn paths were provided)
+    if (hasCdn) {
+      const cdn = await initialcdn();
+      await executeCdnOperation(cdn, input.cdnPaths);
+    }
+
+    // EdgeOne operations: support multiple zone entries from `paths`
+    if (hasEo) {
+      const eoClient = await initialeo();
+      for (const entry of input.eoEntries) {
+        if (!entry.zoneId || !Array.isArray(entry.paths) || entry.paths.length === 0) continue;
+        core.info(`Processing EdgeOne zone: ${entry.zoneId} with ${entry.paths.length} targets`);
+        await executeEoOperation(eoClient, entry.zoneId, entry.paths);
+      }
     }
   } catch (error) {
     core.error("Execution failed ❌");
